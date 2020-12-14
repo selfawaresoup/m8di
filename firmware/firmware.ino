@@ -1,7 +1,10 @@
 #include <MIDI.h>
 #include <queue>
 
-# define DEBUG 1;
+//# define DEBUG 1
+#define BLINK 1
+#define LED_TIMEOUT 20
+#define BLINK_ON_ACTIVESENSE false
 
 MIDI_CREATE_INSTANCE(HardwareSerial, Serial1, MIDI1);
 MIDI_CREATE_INSTANCE(HardwareSerial, Serial2, MIDI2);
@@ -34,6 +37,7 @@ struct Message {
 
 std::queue<Message> msg_q;
 int led = 13;
+long t1 = 0, t2 = 0;
 
 void setup() {
   pinMode(led, OUTPUT);
@@ -57,9 +61,11 @@ void printMsg(String prefix, Message msg) {
 void loop() {
   // put your main code here, to run repeatedly:
   byte i;
+  bool blink = false;
   
   for (i = 0; i < 8; i++) {
     if (midi_ports[i].read()) {
+      blink = true;
       Message rcv_msg;
       rcv_msg.input = i;
       rcv_msg.type = midi_ports[i].getType();
@@ -70,6 +76,11 @@ void loop() {
       #ifdef DEBUG
         printMsg("Received", rcv_msg);
       #endif
+      if (rcv_msg.type == midi::ActiveSensing) {
+        if (!BLINK_ON_ACTIVESENSE) {
+          blink = false;
+        }
+      }
     }
     
     while(!msg_q.empty()) {
@@ -84,5 +95,17 @@ void loop() {
       }
       msg_q.pop();
     }
+
+    #ifdef BLINK
+    t1 = millis();
+    if (blink) {
+      digitalWrite(led, HIGH);
+      t2 = t1;
+    } else {
+      if (t1 - t2 > LED_TIMEOUT) {
+        digitalWrite(led, LOW);
+      }  
+    }
+    #endif
   }
 }
